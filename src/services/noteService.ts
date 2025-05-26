@@ -60,4 +60,3 @@ export const deleteNote = async (id: string): Promise<Note> => {
     throw new Error('Failed to delete note');
   }
 };
-console.log('Token:', import.meta.env.VITE_NOTEHUB_TOKEN);
