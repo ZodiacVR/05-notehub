@@ -1,62 +1,49 @@
 import axios from 'axios';
-import type { AxiosResponse } from 'axios';
-import type { Note, NoteResponse } from '../types/note';
+import type { Note } from '../types/note';
 
-const BASE_URL = 'https://notehub-public.goit.study/api/notes';
+interface NoteResponse {
+  notes: Note[];
+  totalPages: number;
+}
 
-export const fetchNotes = async (
-  page: number,
-  perPage: number,
-  search?: string
-): Promise<NoteResponse> => {
+export const fetchNotes = async (search: string, page: number = 1, perPage: number = 10): Promise<NoteResponse> => {
   try {
-    const response: AxiosResponse<NoteResponse> = await axios.get(BASE_URL, {
-      params: {
-        page,
-        perPage,
-        search,
-      },
+    const response = await axios.get<NoteResponse>('https://api.example.com/notes', {
+      params: { search, page, perPage },
       headers: {
-        Authorization: `Bearer ${import.meta.env.VITE_NOTEHUB_TOKEN}`,
+        Authorization: `Bearer ${import.meta.env.VITE_API_KEY}`,
       },
     });
     return response.data;
   } catch (error) {
-    if (axios.isAxiosError(error)) {
-      throw new Error(`Failed to fetch notes: ${error.response?.data?.message || error.message}`);
-    }
+    console.error('Fetch notes error:', error);
     throw new Error('Failed to fetch notes');
   }
 };
 
 export const createNote = async (note: Omit<Note, 'id'>): Promise<Note> => {
   try {
-    const response: AxiosResponse<Note> = await axios.post(BASE_URL, note, {
+    const response = await axios.post<Note>('https://api.example.com/notes', note, {
       headers: {
-        Authorization: `Bearer ${import.meta.env.VITE_NOTEHUB_TOKEN}`,
+        Authorization: `Bearer ${import.meta.env.VITE_API_KEY}`,
       },
     });
     return response.data;
   } catch (error) {
-    if (axios.isAxiosError(error)) {
-      throw new Error(`Failed to create note: ${error.response?.data?.message || error.message}`);
-    }
+    console.error('Create note error:', error);
     throw new Error('Failed to create note');
   }
 };
 
-export const deleteNote = async (id: string): Promise<Note> => {
+export const deleteNote = async (id: number): Promise<void> => {
   try {
-    const response: AxiosResponse<Note> = await axios.delete(`${BASE_URL}/${id}`, {
+    await axios.delete(`https://api.example.com/notes/${id}`, {
       headers: {
-        Authorization: `Bearer ${import.meta.env.VITE_NOTEHUB_TOKEN}`,
+        Authorization: `Bearer ${import.meta.env.VITE_API_KEY}`,
       },
     });
-    return response.data;
   } catch (error) {
-    if (axios.isAxiosError(error)) {
-      throw new Error(`Failed to delete note: ${error.response?.data?.message || error.message}`);
-    }
+    console.error('Delete note error:', error);
     throw new Error('Failed to delete note');
   }
 };

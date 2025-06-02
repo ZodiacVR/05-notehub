@@ -1,42 +1,25 @@
-import { useState } from 'react';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import toast, { Toaster } from 'react-hot-toast';
-import { useDebounce } from 'use-debounce';
-import SearchBox from '../SearchBox/SearchBox';
+import { useState, useEffect } from 'react';
+import { useQuery, keepPreviousData } from '@tanstack/react-query';
+import { toast } from 'react-hot-toast';
 import NoteList from '../NoteList/NoteList';
-import Pagination from '../Pagination/Pagination';
 import NoteModal from '../NoteModal/NoteModal';
-import Loader from '../Loader/Loader';
-import ErrorMessage from '../ErrorMessage/ErrorMessage';
-import { fetchNotes, deleteNote } from '../../services/noteService';
-import type { Note } from '../../types/note';
-import styles from './App.module.css';
-import { AxiosError } from 'axios';
+import SearchBox from '../SearchBox/SearchBox';
+import Pagination from '../Pagination/Pagination';
+import { fetchNotes } from '../../services/noteService';
+import type { NoteResponse } from '../../types/note';
 
 export default function App() {
-  const [page, setPage] = useState(1);
   const [search, setSearch] = useState('');
-  const [debouncedSearch] = useDebounce(search, 500);
+  const [page, setPage] = useState(1);
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const perPage = 12;
 
-  const queryClient = useQueryClient();
+  const debouncedSearch = useDebounce(search, 500);
 
-  const { data, isLoading, isError, error } = useQuery({
-    queryKey: ['notes', page, debouncedSearch],
-    queryFn: () => fetchNotes(page, perPage, debouncedSearch || undefined),
-    retry: 1,
-  });
-
-  const deleteMutation = useMutation({
-    mutationFn: deleteNote,
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['notes'] });
-      toast.success('Note deleted successfully!');
-    },
-    onError: (error: AxiosError) => {
-      toast.error(`Failed to delete note: ${error.message}`);
-    },
+  const { data, isLoading, isError, error } = useQuery<NoteResponse>({
+    queryKey: ['notes', debouncedSearch, page],
+    queryFn: () => fetchNotes(debouncedSearch, page),
+    enabled: !!debouncedSearch,
+    placeholderData: keepPreviousData,
   });
 
   const handleSearch = (value: string) => {
@@ -44,48 +27,41 @@ export default function App() {
     setPage(1);
   };
 
-  const handleDelete = (id: string) => {
-    deleteMutation.mutate(id);
-  };
+  const handleOpenModal = () => setIsModalOpen(true);
+  const handleCloseModal = () => setIsModalOpen(false);
 
-  const handleOpenModal = () => {
-    setIsModalOpen(true);
-  };
-
-  const handleCloseModal = () => {
-    setIsModalOpen(false);
-  };
+  if (isError) {
+    toast.error(error?.message || 'Failed to load notes');
+  }
 
   return (
-    <div className={styles.app}>
-      <header className={styles.toolbar}>
-        <SearchBox value={search} onChange={handleSearch} />
-        <Pagination
-          pageCount={data?.totalPages || 1}
-          currentPage={page}
-          onPageChange={setPage}
-        />
-        <button className={styles.button} onClick={handleOpenModal}>
-          Create note +
-        </button>
-      </header>
-      {isLoading && <Loader />}
-      {isError && (
-        <ErrorMessage
-          message={
-            error instanceof AxiosError
-              ? `Failed to fetch notes: ${error.message}`
-              : 'There was an error, please try again...'
-          }
-        />
-      )}
-      {data?.notes.length ? (
-        <NoteList notes={data.notes} onDelete={handleDelete} />
+    <div>
+      <SearchBox onChange={handleSearch} />
+      <button onClick={handleOpenModal}>Add Note</button>
+      {isLoading ? (
+        <p>Loading...</p>
+      ) : data && data.notes.length > 0 ? (
+        <>
+          <NoteList notes={data.notes} />
+          <Pagination
+            pageCount={data.totalPages}
+            onPageChange={setPage}
+            forcePage={page - 1}
+          />
+        </>
       ) : (
-        !isLoading && <p>No notes found.</p>
+        <p>No notes found</p>
       )}
       {isModalOpen && <NoteModal onClose={handleCloseModal} />}
-      <Toaster position="top-right" />
     </div>
   );
+}
+
+function useDebounce<T>(value: T, delay: number): T {
+  const [debouncedValue, setDebouncedValue] = useState(value);
+  useEffect(() => {
+    const handler = setTimeout(() => setDebouncedValue(value), delay);
+    return () => clearTimeout(handler);
+  }, [value, delay]);
+  return debouncedValue;
 }
